@@ -18,6 +18,14 @@ services:
     depends_on:
       - nginx
 
+  web:
+    build: ./frontend
+    volumes:
+      - ./frontend/app:/app
+    environment:
+      - WATCHPACK_POLLING=true
+
+
 volumes:
   hls_data:
   dash_data:
