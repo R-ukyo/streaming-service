@@ -1,0 +1,23 @@
+services:
+  nginx:
+    build: ./nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - hls_data:/var/www/hls
+      - dash_data:/var/www/dash
+      - ./nginx/index.html:/var/www/index.html
+
+  encoder:
+    build: ./encoder
+    volumes:
+      - hls_data:/var/www/hls
+      - dash_data:/var/www/dash
+      - ./encoder/input:/input
+    command: [ "sh", "/usr/local/bin/run.sh" ]
+    depends_on:
+      - nginx
+
+volumes:
+  hls_data:
+  dash_data:

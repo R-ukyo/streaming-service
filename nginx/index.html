@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ja">
+
+<head>
+    <meta charset="utf-8">
+    <title>HLS & DASH Streaming Service</title>
+</head>
+
+<body>
+    <h1>HLS & DASH Streaming Service</h1>
+    <h2>HLS Streaming Prototype</h2>
+
+    <video id="video_hls" controls autoplay width="640" height="360"></video>
+
+    <h2>DASH Streaming Prototype</h2>
+
+    <video id="video_dash" controls autoplay width="640" height="360"></video>
+
+    <!-- hls.js -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script>
+        const video_hls = document.getElementById('video_hls');
+        const src = '/hls/stream.m3u8';
+
+        // Safariなど、ネイティブHLS再生対応ブラウザ
+        if (video_hls.canPlayType('application/vnd.apple.mpegurl')) {
+            video_hls.src = src;
+        }
+        // その他のブラウザは hls.js を利用
+        else if (Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(src);
+            hls.attachMedia(video_hls);
+        } else {
+            alert('このブラウザは HLS に対応していません。');
+        }
+    </script>
+
+    <!-- dash.js -->
+    <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
+    <script>
+        const player = dashjs.MediaPlayer().create();
+        player.initialize(document.getElementById("video_dash"), "/dash/stream.mpd", true);
+    </script>
+</body>
+
+</html>
