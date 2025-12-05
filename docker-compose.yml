@@ -22,6 +22,7 @@ services:
     build: ./frontend
     volumes:
       - ./frontend/app:/app
+      - /app/node_modules
     environment:
       - WATCHPACK_POLLING=true
 
