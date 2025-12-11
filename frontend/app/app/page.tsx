@@ -24,16 +24,15 @@ export default function Home() {
       };
     } else {
       console.error('This browser does not support HLS.');
-      // Optional: Display a message to the user
     }
   }, []);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-start bg-zinc-50 py-10 font-sans dark:bg-black text-black dark:text-white">
-      <h1 className="mb-8 text-3xl font-bold">HLS Streaming Service</h1>
+      <h1 className="mb-8 text-3xl font-bold">King of Live</h1>
 
       <div className="mb-12 w-full max-w-3xl px-4">
-        <h2 className="mb-4 text-2xl font-semibold">HLS Streaming Prototype</h2>
+        <h2 className="mb-4 text-2xl font-semibold">はいしん</h2>
         <video
           ref={hlsVideoRef}
           controls
