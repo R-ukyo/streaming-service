@@ -8,7 +8,12 @@ export default function Home() {
 
   useEffect(() => {
     const video = hlsVideoRef.current;
-    const src = '/hls/stream.m3u8';
+
+    // ローカルでエンコードしたm3u8ファイル
+    // const src = '/hls/stream.m3u8';
+
+    // GCPで生配信したm3u8ファイル
+    const src = 'https://storage.cloud.google.com/king-of-livestream-output/main.m3u8';
 
     if (!video) return;
 
