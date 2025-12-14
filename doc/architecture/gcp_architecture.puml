@@ -1,0 +1,162 @@
+@startuml gcp_architecture
+left to right direction
+skinparam componentStyle uml2
+
+'==========================
+' Actors
+'==========================
+actor "Streamer\n(OBS)" as Streamer
+actor "Administrator" as Admin
+actor "User\n(Web/App)" as EndUser
+
+'==========================
+' Frontend
+'==========================
+package "Frontend" {
+  component "Streamer / Admin\nDashboard (Web App)" as Dashboard
+  component "Playback UI\n(Web/App)" as PlaybackUI
+}
+
+'==========================
+' Auth & Payment
+'==========================
+package "Auth & Payment" {
+  component "Existing User ID System" as ExistingID
+  component "Identity Platform\n(Firebase Auth compatible)" as Identity
+  component "Stripe / Google Play\n(Payments)" as Payment
+}
+
+'==========================
+' Streaming (Live Stream API)"
+'==========================
+package "Streaming" {
+  component "Live Stream API\n(Channel / Ingest)" as LiveStreamAPI
+}
+
+'==========================
+' Storage & Delivery
+'==========================
+package "Storage & Delivery" {
+  database "Cloud Storage\n(Live/VOD HLS Assets)" as GCS
+  cloud "Media CDN" as MediaCDN
+}
+
+'==========================
+' Backend (VPC)
+'==========================
+package "Backend (VPC)" {
+
+  package "API Layer" {
+    component "HTTP(S) Load Balancer\n+ API Gateway" as APIGateway
+  }
+
+  package "Application" {
+    component "Cloud Run\n(Backend API)" as CloudRunAPI
+    component "Cloud Run\n(WebSocket Chat)" as CloudRunWS
+  }
+
+  package "Data Store" {
+    database "Cloud SQL\n(Streamers / Users / Subs)" as CloudSQL
+    database "Memorystore\n(Redis)" as Redis
+    database "Firestore\n(Chat / Docs)" as Firestore
+  }
+
+  package "Events & Analytics" {
+    queue "Pub/Sub\n(Event Stream)" as PubSub
+    database "BigQuery\n(Logs / Events)" as BigQuery
+    component "Vertex AI\n(Recommendations)" as VertexAI
+    component "Transcoder API\n(VOD Transcode)" as Transcoder
+  }
+}
+
+'==========================
+' Secrets
+'==========================
+package "Secrets & Config" {
+  component "Secret Manager\n(Stream Keys / Config)" as Secrets
+}
+
+'==========================
+' Auth Flow
+'==========================
+EndUser --> PlaybackUI : Open App / Web
+PlaybackUI --> Identity : Login (User)
+Dashboard --> Identity : Login (Streamer/Admin)
+Identity <.. ExistingID : Federation\n(OIDC/SAML)
+
+'==========================
+' Management (Channel / Stream Key)
+'==========================
+Streamer --> Dashboard : Channel Settings /\nGet Stream Key
+Admin --> Dashboard : Ban / Channel Control
+
+Dashboard --> APIGateway : API Request\n(with ID Token)
+APIGateway --> CloudRunAPI : Authenticated Call
+APIGateway --> Identity : JWT validation\n(Authorizer / IAM)
+
+CloudRunAPI --> CloudSQL : Manage Streamer /\nBan Info / Channel Meta
+CloudRunAPI ..> Secrets : Get / Rotate\nStream Keys & Config
+CloudRunAPI --> LiveStreamAPI : Create Channel /\nUpdate Ingest Settings
+
+'==========================
+' Streaming Flow (OBS -> Live Stream API -> Playback)
+'==========================
+Streamer --> LiveStreamAPI : RTMP / WHIP\n(with Stream Key)
+LiveStreamAPI <.. Secrets : Ingest Auth\n(Stream Key / Token)
+
+' Live HLS / LL-HLS 出力
+LiveStreamAPI --> GCS : HLS / LL-HLS Segments\n(Live Output)
+GCS --> MediaCDN : Origin (Live/VOD HLS)
+MediaCDN --> PlaybackUI : Low-latency Stream\n(HLS / LL-HLS)
+
+'==========================
+' Playback Entitlement Flow
+'==========================
+PlaybackUI --> APIGateway : Request Playback Info\n/ Entitlement
+APIGateway --> CloudRunAPI
+CloudRunAPI --> CloudSQL : Check Subscription /\nTicket / Membership
+CloudRunAPI --> GCS : Generate Signed URL\n(if needed)
+CloudRunAPI --> PlaybackUI : Playback URL / Token
+
+'==========================
+' VOD / Archive Flow
+'==========================
+LiveStreamAPI --> GCS : Auto-Record Live\n(Archive Assets)
+GCS --> Transcoder : VOD Transcode Job\n(optional)
+Transcoder --> GCS : VOD HLS / MP4
+
+PlaybackUI --> APIGateway : Request VOD List / URL
+APIGateway --> CloudRunAPI
+CloudRunAPI --> CloudSQL : Get VOD Meta\n(visibility / entitlement)
+CloudRunAPI --> GCS : Signed URL for VOD
+CloudRunAPI --> PlaybackUI : VOD Playback URL
+
+'==========================
+' Payment Flow (Subscription / Tips)
+'==========================
+PlaybackUI --> APIGateway : Start Payment\n(Tip / Sub / Ticket)
+APIGateway --> CloudRunAPI
+CloudRunAPI --> Payment : Create Checkout /\nBilling Session
+
+' 決済完了 Webhook
+Payment --> CloudRunAPI : Webhook\n(Payment Succeeded / Failed)
+CloudRunAPI --> CloudSQL : Update Subscription /\nBalance / Membership
+
+'==========================
+' Realtime Chat / Reaction
+'==========================
+PlaybackUI <--> CloudRunWS : WebSocket\n(Chat / Reactions)
+CloudRunWS <--> Redis : Pub/Sub\n(Room Broadcast / Presence)
+CloudRunWS --> Firestore : Persist Chat Logs /\nPinned Messages
+
+'==========================
+' Events & Analytics
+'==========================
+CloudRunAPI --> PubSub : Events\n(view/chat/tip)
+CloudRunWS --> PubSub : Chat Events\n(reactions / gifts)
+PubSub --> BigQuery : Stream Logs / Events
+
+BigQuery --> VertexAI : Feature Data\n(for Recs)
+VertexAI --> CloudRunAPI : Recommended Streams\n/ Clips / VODs
+
+@enduml

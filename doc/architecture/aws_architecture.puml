@@ -1,0 +1,130 @@
+@startuml aws_architecture
+left to right direction
+skinparam componentStyle uml2
+
+'==========================
+' Actors
+'==========================
+actor "Streamer\n(OBS)" as Streamer
+actor "Administrator" as Admin
+actor "User\n(Web/App)" as EndUser
+
+'==========================
+' Frontend
+'==========================
+package "Frontend" {
+  component "Streamer / Admin\nDashboard (Web)" as Dashboard
+  component "Playback UI\n(Web/App)" as PlaybackUI
+}
+
+'==========================
+' Auth & Payment
+'==========================
+package "Auth & Payment" {
+  component "Existing User ID System" as ExistingID
+  component "Amazon Cognito\n(User Pool)" as Cognito
+  component "Stripe" as Stripe
+}
+
+'==========================
+' Streaming (IVS)
+'==========================
+package "Streaming" {
+  component "Amazon IVS\n(Live Channel)" as IVS
+}
+
+'==========================
+' Backend (VPC)
+'==========================
+package "Backend (VPC)" {
+
+  package "API Layer" {
+    component "API Gateway\n(REST)" as APIGWRest
+    component "API Gateway\n(WebSocket)" as APIGWWS
+  }
+
+  package "Application" {
+    component "AWS Lambda\n(Business Logic)" as Lambda
+  }
+
+  package "Data Store" {
+    database "Aurora / RDS\n(Streamers / Users / Subs)" as RDS
+    database "ElastiCache\n(Redis)" as Redis
+  }
+
+  package "Events & Analytics" {
+    queue "Kinesis Firehose" as Firehose
+    database "S3\n(Logs / Events / VOD Archive)" as S3
+    component "Athena\n(Analysis)" as Athena
+    component "MediaConvert\n(VOD Transcode)" as MediaConvert
+  }
+}
+
+'==========================
+' Auth Flow
+'==========================
+EndUser --> PlaybackUI : Open App / Web
+PlaybackUI --> Cognito : Login (User)
+Dashboard --> Cognito : Login (Streamer/Admin)
+Cognito <.. ExistingID : Federation (OIDC/SAML)
+
+'==========================
+' Management (Channel / Stream Key)
+'==========================
+Streamer --> Dashboard : Channel Settings / Get Stream Key
+Admin --> Dashboard : Ban / Channel Control
+
+Dashboard --> APIGWRest : API Request (with ID Token)
+APIGWRest --> Cognito : JWT validation (Authorizer)
+APIGWRest --> Lambda : Authenticated Call
+
+Lambda --> RDS : Manage Streamer / Ban Info
+Lambda --> IVS : Create Channel / Issue Stream Key / Stop Stream
+
+'==========================
+' Streaming Flow (OBS -> IVS -> Playback UI)
+'==========================
+Streamer --> IVS : RTMPS (Stream Key)
+IVS --> PlaybackUI : Live Playback URL (Low Latency)
+
+PlaybackUI --> APIGWRest : Request Playback Info / Entitlement
+APIGWRest --> Lambda
+Lambda --> RDS : Subscription / Ticket Check
+Lambda --> IVS : Get Playback URL
+
+'==========================
+' VOD / Archive Flow
+'==========================
+IVS --> S3 : Auto-Record Live Stream (MP4/TS segments)
+S3 --> MediaConvert : Transcode Job (optional)
+MediaConvert --> S3 : VOD Assets (HLS/MP4)
+PlaybackUI --> APIGWRest : Request VOD List / URL
+APIGWRest --> Lambda
+Lambda --> S3 : Generate Signed URL (if needed)
+
+'==========================
+' Payment Flow (Subscription / Tips)
+'==========================
+PlaybackUI --> APIGWRest : Start Payment (Tip / Sub)
+APIGWRest --> Lambda
+Lambda --> Stripe : Create Checkout / Billing Session
+
+Stripe --> APIGWRest : Webhook (Success/Failure)
+APIGWRest --> Lambda
+Lambda --> RDS : Update Subscription / Balance
+
+'==========================
+' Realtime Chat / Reaction
+'==========================
+PlaybackUI <--> APIGWWS : WebSocket (Chat / Reactions)
+APIGWWS --> Lambda : Message
+Lambda <--> Redis : Pub/Sub (Room Broadcast)
+
+'==========================
+' Events & Analytics
+'==========================
+Lambda --> Firehose : Events (view/chat/tip)
+Firehose --> S3 : Logs / Event Storage
+S3 --> Athena : BI / Reports
+
+@enduml

@@ -1,0 +1,57 @@
+{
+    "inputAttachments": [
+        {
+            "key": "my-input",
+            "input": "projects/${PROJECT_NUMBER}/locations/${LOCATION}/inputs/${INPUT_ID}"
+        }
+    ],
+    "output": {
+        "uri": "gs://${BUCKET_NAME}"
+    },
+    "elementaryStreams": [
+        {
+            "key": "es_video",
+            "videoStream": {
+                "h264": {
+                    "profile": "high",
+                    "widthPixels": 1280,
+                    "heightPixels": 720,
+                    "bitrateBps": 3000000,
+                    "frameRate": 30
+                }
+            }
+        },
+        {
+            "key": "es_audio",
+            "audioStream": {
+                "codec": "aac",
+                "channelCount": 2,
+                "bitrateBps": 160000
+            }
+        }
+    ],
+    "muxStreams": [
+        {
+            "key": "mux_video_ts",
+            "container": "ts",
+            "elementaryStreams": [
+                "es_video",
+                "es_audio"
+            ],
+            "segmentSettings": {
+                "segmentDuration": "2s"
+            }
+        }
+    ],
+    "manifests": [
+        {
+            "key": "manifest_hls",
+            "fileName": "main.m3u8",
+            "type": "HLS",
+            "muxStreams": [
+                "mux_video_ts"
+            ],
+            "maxSegmentCount": 5
+        }
+    ]
+}
