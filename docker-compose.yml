@@ -3,30 +3,18 @@ services:
     build: ./nginx
     ports:
       - "8080:80"
-    volumes:
-      - hls_data:/var/www/hls
-      - dash_data:/var/www/dash
-      - ./nginx/index.html:/var/www/index.html
-
-  encoder:
-    build: ./encoder
-    volumes:
-      - hls_data:/var/www/hls
-      - dash_data:/var/www/dash
-      - ./encoder/input:/input
-    command: [ "sh", "/usr/local/bin/run.sh" ]
-    depends_on:
-      - nginx
+    restart: unless-stopped
 
   web:
     build: ./frontend
     volumes:
       - ./frontend/app:/app
       - /app/node_modules
+      - /app/.next
     environment:
-      - WATCHPACK_POLLING=true
-
-
-volumes:
-  hls_data:
-  dash_data:
+      - NODE_ENV=development
+    command: pnpm run dev
+    restart: unless-stopped
+    deploy:
+      mode: replicated
+      replicas: 3
