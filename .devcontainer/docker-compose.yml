@@ -1,20 +1,17 @@
 services:
   nginx:
-    build: ./nginx
+    build: ../nginx
     ports:
       - "8080:80"
     restart: unless-stopped
 
   web:
-    build: ./frontend
+    build: ../frontend
     volumes:
-      - ./frontend/app:/app
+      - ../frontend/app:/app
       - /app/node_modules
       - /app/.next
     environment:
       - NODE_ENV=development
     command: pnpm run dev
     restart: unless-stopped
-    deploy:
-      mode: replicated
-      replicas: 3
