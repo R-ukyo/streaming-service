@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-const storage = new Storage();
+const storage = new Storage({
+    keyFilename: process.env.GCS_KEY_FILE,
+});
 
 function guessContentType(name: string): string {
     if (name.endsWith(".m3u8")) return "application/vnd.apple.mpegurl";
@@ -18,11 +20,18 @@ export async function GET(
     { params }: { params: Promise<{ name: string }> }
 ) {
     const bucketName = process.env.HLS_BUCKET;
-    const prefix = process.env.HLS_PREFIX ?? "mux_video_ts";
+    const prefix = process.env.HLS_PREFIX;
 
     if (!bucketName) {
         console.error("HLS_BUCKET環境変数が設定されていません");
         return new NextResponse("Server configuration error: HLS_BUCKET not set", {
+            status: 500
+        });
+    }
+
+    if (!prefix) {
+        console.error("HLS_PREFIX環境変数が設定されていません");
+        return new NextResponse("Server configuration error: HLS_PREFIX not set", {
             status: 500
         });
     }
@@ -36,10 +45,8 @@ export async function GET(
     try {
         const [buf] = await storage.bucket(bucketName).file(objectPath).download();
 
-        // マニフェストファイル（.m3u8）の場合、相対パスを書き換える
         if (fileName.endsWith(".m3u8")) {
             const content = buf.toString("utf-8");
-            // セグメントファイルのパスを /hls/ 経由に書き換え
             const rewrittenContent = content.replace(
                 /^(?!#|http|\/hls\/)(.+\.(?:ts|m4s|mp4|m3u8))$/gm,
                 "/hls/$1"
@@ -56,8 +63,7 @@ export async function GET(
             });
         }
 
-        // セグメントファイル（.ts, .m4s, .mp4など）
-        return new NextResponse(new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength), {
+        return new NextResponse(buf as any, {
             headers: {
                 "content-type": guessContentType(fileName),
                 "cache-control": "no-cache, no-store, must-revalidate",

@@ -1,0 +1,53 @@
+name: Deploy to Cloud Run (Docker)
+
+on:
+  push:
+    branches: [
+      "main"
+    ]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/deploy-frontend.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+        IMAGE: asia-northeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.AR_REPO }}/${{ vars.SERVICE_NAME }}:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Auth to Google Cloud (WIF)
+        uses: google-github-actions/auth@v3
+        with:
+          token_format: access_token
+          workload_identity_provider: ${{ vars.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker login to Artifact Registry
+        run: |
+          gcloud auth configure-docker asia-northeast1-docker.pkg.dev --quiet
+
+      - name: Build and Push
+        run: |
+          docker build -t "${IMAGE}" -f frontend/Dockerfile frontend
+          docker push "${IMAGE}"
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy "${{ vars.SERVICE_NAME }}" \
+            --image "${IMAGE}" \
+            --region "${{ vars.GCP_REGION }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}"

@@ -8,7 +8,7 @@ export default function Home() {
 
   useEffect(() => {
     const video = hlsVideoRef.current;
-    const src = "/hls/index.m3u8";
+    const src = "/hls/index-1.m3u8";
 
     if (!video) return;
 
@@ -16,16 +16,14 @@ export default function Home() {
       video.src = src;
     } else if (Hls.isSupported()) {
       const hls = new Hls({
-        // ライブストリーミング用の設定
-        liveSyncDurationCount: 3, // ライブエッジに近づける（遅延を減らす）
-        liveMaxLatencyDurationCount: 10, // 最大遅延
-        enableWorker: true, // Web Workerを使用してパフォーマンス向上
-        lowLatencyMode: true, // 低遅延モード
-        backBufferLength: 90, // バックバッファの長さ（秒）
-        maxBufferLength: 30, // 最大バッファ長（秒）
-        maxMaxBufferLength: 60, // 最大バッファ長の上限（秒）
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 10,
+        enableWorker: true,
+        lowLatencyMode: true,
+        backBufferLength: 90,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
         xhrSetup: (xhr) => {
-          // キャッシュを無効化してリアルタイムデータを取得
           xhr.withCredentials = false;
         }
       });
