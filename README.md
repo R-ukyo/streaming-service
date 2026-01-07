@@ -114,14 +114,43 @@ docker compose run --rm web pnpm install
 - `GOOGLE_APPLICATION_CREDENTIALS` が正しく設定されているか確認
 - サービスアカウントキーのパスが正しいか確認
 
-## 本番環境へのデプロイ
+## GitHub Actions での Workload Identity Federation 設定
 
-本番環境では以下を推奨します：
+GitHub Actions から GCP リソースへ安全にアクセスするために、サービスアカウントキー（JSON）の代わりに Workload Identity Federation (WIF) を使用します。
 
-1. **Workload Identity** を使用した認証
-2. **Cloud Run** または **GKE** へのデプロイ
-3. **Cloud CDN** による配信の高速化
-4. **Cloud Load Balancing** による負荷分散
+### 1. Workload Identity プールとプロバイダの作成 (Google Cloud Console)
+
+1. **[IAM と管理] > [Workload Identity 連携]** に移動します。
+2. **[プールを作成]** をクリックします。
+   - **名前**: `github-pool`（任意）を入力して、[次へ] をクリック。
+3. **[プロバイダを追加]** を選択します。
+   - **プロバイダの選択**: `OpenID Connect (OIDC)`
+   - **プロバイダ名**: `github-provider`（任意）
+   - **発行元（URL）**: `https://token.actions.githubusercontent.com`
+   - **オーディエンス**: デフォルト（通常は変更不要）
+4. **[属性のマッピング]** を設定します：
+   - `google.subject` = `assertion.sub`
+   - `attribute.actor` = `assertion.actor`
+   - `attribute.repository` = `assertion.repository`
+5. **[保存]** をクリックします。
+
+### 2. サービスアカウントへのアクセス許可
+
+1. 作成したプールの詳細画面で **[アクセスを許可]** をクリックします。
+2. 使用したい**サービスアカウント**を選択します。
+3. **[プロバイダで構成された属性を選択]** で以下のように制限を加えます（セキュリティのため必須）：
+   - **属性名**: `repository`
+   - **属性値**: `your-username/streaming-service` (GitHub のユーザー名/リポジトリ名)
+4. **[保存]** をクリックします。
+5. 表示されるポータルから **Workload Identity プロバイダの ID** をコピーします。
+   - 形式: `projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github-pool/providers/github-provider`
+
+### 3. GitHub Actions の設定
+
+GitHub リポジトリの **Settings > Secrets and variables > Actions** に以下の **Variables** を登録します。
+
+- `WORKLOAD_IDENTITY_PROVIDER`: 手順 2-5 でコピーした ID
+- `SERVICE_ACCOUNT`: 使用するサービスアカウントのメールアドレス
 
 ## 参考リンク
 
