@@ -1,80 +1,43 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import Hls from 'hls.js';
+import VideoPlayer from '../components/VideoPlayer';
+import VideoInfo from '../components/VideoInfo';
+import Chat from '../components/Chat';
+import Comments from '../components/Comments';
 
 export default function Home() {
-  const hlsVideoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    const video = hlsVideoRef.current;
-    const src = "/hls/index-1.m3u8";
-
-    if (!video) return;
-
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = src;
-    } else if (Hls.isSupported()) {
-      const hls = new Hls({
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 10,
-        enableWorker: true,
-        lowLatencyMode: true,
-        backBufferLength: 90,
-        maxBufferLength: 30,
-        maxMaxBufferLength: 60,
-        xhrSetup: (xhr) => {
-          xhr.withCredentials = false;
-        }
-      });
-      hls.loadSource(src);
-      hls.attachMedia(video);
-
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal) {
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              console.error('ネットワークエラーが発生しました。再試行します...');
-              hls.startLoad();
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              console.error('メディアエラーが発生しました。復旧を試みます...');
-              hls.recoverMediaError();
-              break;
-            default:
-              console.error('致命的なエラーが発生しました。', data);
-              hls.destroy();
-              break;
-          }
-        }
-      });
-
-      return () => {
-        hls.destroy();
-      };
-    } else {
-      console.error('このブラウザはHLSをサポートしていません。');
-    }
-  }, []);
-
   return (
-    <div className="flex min-h-screen flex-col items-center justify-start bg-gradient-to-br from-purple-900 via-purple-800 to-indigo-900 py-10 font-sans text-white">
-      <h1 className="mb-8 text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-purple-300">
-        King of Live
-      </h1>
+    <div className="flex min-h-screen flex-col lg:flex-row gap-6 p-4 md:p-6 lg:p-8 justify-center">
+      {/* Main Content: Video + Info + Comments */}
+      <div className="flex w-full flex-1 flex-col max-w-[1280px]">
+        <VideoPlayer />
+        <VideoInfo />
+        <Comments />
+      </div>
 
-      <div className="mb-12 w-full max-w-4xl px-4">
-        <h2 className="mb-4 text-2xl font-semibold">ライブ配信</h2>
-        <video
-          ref={hlsVideoRef}
-          controls
-          autoPlay
-          muted
-          className="w-full aspect-video bg-black rounded-xl shadow-2xl ring-4 ring-purple-500/50"
-        />
-        <p className="mt-4 text-sm text-purple-200">
-          GCP Livestream API経由でHLS配信中
-        </p>
+      {/* Sidebar: Chat (Desktop) or Recommendations */}
+      <div className="w-full lg:w-[350px] xl:w-[400px] shrink-0">
+        <Chat />
+
+        {/* Recommended Videos (Dummy List below chat for now roughly) */}
+        <div className="mt-6 flex flex-col gap-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex gap-2 cursor-pointer group">
+              <div className="w-40 aspect-video bg-gray-800 rounded-lg overflow-hidden relative">
+                <div className="absolute inset-0 flex items-center justify-center text-gray-600 font-bold group-hover:text-primary transition-colors">
+                  Thumbnail
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <h4 className="text-sm font-bold text-white line-clamp-2 group-hover:text-primary transition-colors">
+                  おすすめ動画タイトル {i}
+                </h4>
+                <span className="text-xs text-gray-400">チャンネル名</span>
+                <span className="text-xs text-gray-400">10万回視聴 • 2日前</span>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
