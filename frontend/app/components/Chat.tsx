@@ -1,80 +1,134 @@
-import UserAvatar from './UserAvatar';
+"use client";
+
+import React, { useState, useEffect, useRef } from 'react';
+import { io, Socket } from 'socket.io-client';
+
+interface Message {
+    user: string;
+    text: string;
+    timestamp: number;
+}
 
 export default function Chat() {
-    const messages = [
-        { user: 'User A', color: 'text-blue-400', message: 'こんにちは！' },
-        { user: 'User B', color: 'text-green-400', message: '待機所から来ました' },
-        { user: 'Tanaka', color: 'text-orange-400', message: 'はじまったー！' },
-        { user: 'Suzuki', color: 'text-purple-400', message: '画質いいね' },
-        { user: 'DevKing', color: 'text-red-400', message: 'AIすごいな' },
-        { user: 'ReactFan', color: 'text-cyan-400', message: 'Next.js?' },
-        { user: 'Guest', color: 'text-gray-400', message: 'こんばんは' },
-        { user: 'User A', color: 'text-blue-400', message: '音声クリアです' },
-        { user: 'User B', color: 'text-green-400', message: 'wkwk' },
-        { user: 'SuperChatter', color: 'text-yellow-400', message: '¥500 ナイス配信！', isSuperChat: true },
-        { user: 'Tanaka', color: 'text-orange-400', message: 'おー' },
-        { user: 'Suzuki', color: 'text-purple-400', message: '88888888' },
-    ];
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [input, setInput] = useState('');
+    const [currentUser, setCurrentUser] = useState<string>('Guest');
+    const [socket, setSocket] = useState<Socket | null>(null);
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const newSocket = io({
+            path: '/chat-socket/',
+        });
+
+        setSocket(newSocket);
+
+        newSocket.on('assign id', (id: string) => {
+            setCurrentUser(id);
+        });
+        newSocket.on('chat history', (history: Message[]) => {
+            setMessages(history);
+        });
+
+        newSocket.on('chat message', (msg: Message) => {
+            setMessages((prev: Message[]) => [...prev, msg]);
+        });
+
+        return () => {
+            newSocket.close();
+        };
+    }, []);
+
+    useEffect(() => {
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+    }, [messages]);
+
+    const sendMessage = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (input.trim() && socket) {
+            const msg: Partial<Message> = {
+                text: input,
+            };
+            socket.emit('chat message', msg);
+            setInput('');
+        }
+    };
 
     return (
-        <div className="flex h-full w-full flex-col rounded-xl border border-border bg-surface lg:h-[calc(100vh-6rem)] lg:w-[350px] xl:w-[400px]">
-            {/* Chat Header */}
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                <h3 className="text-base font-medium text-white">上位チャット</h3>
+        <div className="flex flex-col h-[500px] lg:h-[calc(100vh-140px)] bg-[#0f0f0f] border border-neutral-800 rounded-xl overflow-hidden w-full shadow-2xl">
+            <div className="p-4 border-b border-neutral-800 bg-[#1e1e1e] flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <button className="text-gray-400 hover:text-white">︙</button>
+                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                    <h2 className="text-white font-bold text-sm tracking-wide">ライブチャット</h2>
                 </div>
+                <span className="text-[10px] text-neutral-500 bg-neutral-800 px-2 py-1 rounded-full border border-neutral-700">
+                    ID: {currentUser}
+                </span>
             </div>
 
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-2 custom-scrollbar flex flex-col gap-2">
-                <div className="rounded bg-yellow-900/30 p-2 text-xs text-yellow-200 text-center mb-2 border border-yellow-700/50">
-                    ライブ王へようこそ！マナーを守って楽しくチャットしましょう。
-                </div>
-
-                {messages.map((msg, i) => (
-                    <div key={i} className={`flex items-start gap-2 text-sm px-2 py-1 transition-colors hover:bg-white/5 ${msg.isSuperChat ? 'bg-primary/20 rounded border-l-4 border-primary' : ''}`}>
-                        {!msg.isSuperChat && (
-                            <UserAvatar name={msg.user} size="6" />
-                        )}
-                        <div className="flex flex-col">
+            <div
+                ref={scrollRef}
+                className="flex-1 overflow-y-auto p-4 space-y-3 scroll-smooth custom-scrollbar"
+            >
+                {messages.length === 0 && (
+                    <div className="h-full flex flex-col items-center justify-center text-neutral-500 space-y-2 opacity-50">
+                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                        <p className="text-xs">チャットへようこそ！</p>
+                    </div>
+                )}
+                {messages.map((msg, idx) => (
+                    <div key={idx} className="flex gap-3 group">
+                        <div className="w-8 h-8 rounded-full bg-neutral-800 flex-shrink-0 flex items-center justify-center text-[10px] font-bold text-neutral-400 border border-neutral-700">
+                            {msg.user.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div className="flex flex-col flex-1 min-w-0">
                             <div className="flex items-baseline gap-2">
-                                <span className={`font-medium ${msg.color} text-[11px]`}>{msg.user}</span>
-                                {msg.isSuperChat && <span className="text-xs font-bold text-white">¥500</span>}
+                                <span className={`text-[11px] font-bold truncate ${msg.user === currentUser ? 'text-primary' : 'text-neutral-400'}`}>
+                                    {msg.user}
+                                </span>
+                                <span className="text-[9px] text-neutral-600">
+                                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
                             </div>
-                            <span className={`${msg.isSuperChat ? 'text-white font-medium' : 'text-gray-200'} text-xs leading-relaxed`}>
-                                {msg.message}
+                            <span className="text-sm text-neutral-200 mt-0.5 break-words leading-relaxed">
+                                {msg.text}
                             </span>
                         </div>
                     </div>
                 ))}
             </div>
 
-            {/* Input Area */}
-            <div className="border-t border-border p-3">
-                <div className="flex items-center gap-2 mb-2">
-                    <UserAvatar name="King" size="6" />
-                    <span className="text-xs text-gray-400">King of Liveとしてチャット</span>
+            <form onSubmit={sendMessage} className="p-4 bg-[#1e1e1e] border-t border-neutral-800">
+                <div className="flex flex-col gap-3">
+                    <div className="relative">
+                        <input
+                            type="text"
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            placeholder="メッセージを送信..."
+                            className="w-full bg-[#0f0f0f] text-white text-sm rounded-lg pl-3 pr-10 py-2.5 outline-none border border-transparent focus:border-primary/50 transition-all placeholder:text-neutral-600"
+                        />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div className="flex justify-end border-t border-neutral-800 pt-3">
+                        <button
+                            type="submit"
+                            disabled={!input.trim()}
+                            className="bg-primary hover:bg-primary-hover disabled:bg-neutral-800 disabled:text-neutral-600 text-black rounded-lg px-6 py-1.5 text-xs font-bold transition-all transform active:scale-95"
+                        >
+                            送信
+                        </button>
+                    </div>
                 </div>
-                <div className="relative">
-                    <input
-                        type="text"
-                        placeholder="チャットする..."
-                        className="w-full rounded-full bg-secondary px-4 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary placeholder-gray-500"
-                    />
-                    <button className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary">
-                        Example
-                    </button>
-                </div>
-                <div className="flex justify-between items-center mt-2 px-1">
-                    <span className="text-xs text-gray-500">0/200</span>
-                    <button className="text-primary hover:text-primary-hover">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
+            </form>
         </div>
     );
 }

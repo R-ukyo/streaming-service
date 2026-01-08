@@ -16,7 +16,7 @@ export default function Home() {
       </div>
 
       {/* Sidebar: Chat (Desktop) or Recommendations */}
-      <div className="w-full lg:w-[350px] xl:w-[400px] shrink-0">
+      <div className="w-full lg:w-[350px] xl:w-[400px] shrink-0 sticky lg:top-8 self-start">
         <Chat />
 
         {/* Recommended Videos (Dummy List below chat for now roughly) */}

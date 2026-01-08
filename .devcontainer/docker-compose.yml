@@ -15,3 +15,14 @@ services:
       - NODE_ENV=development
     command: pnpm run dev
     restart: unless-stopped
+    network_mode: "service:nginx"
+
+  chat:
+    build: ../chat-server
+    volumes:
+      - ../chat-server:/app
+      - /app/node_modules
+    environment:
+      - PORT=3001
+    restart: unless-stopped
+    network_mode: "service:nginx"
