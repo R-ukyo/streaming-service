@@ -1,4 +1,4 @@
-name: Deploy Frontend to Cloud Run (Docker)
+name: Deploy Chat Server to Cloud Run (Docker)
 
 on:
   push:
@@ -6,8 +6,8 @@ on:
       "main"
     ]
     paths:
-      - "frontend/**"
-      - ".github/workflows/deploy-frontend.yml"
+      - "chat-server/**"
+      - ".github/workflows/deploy-chat-server.yml"
 
 permissions:
   id-token: write
@@ -17,7 +17,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-        IMAGE: asia-northeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.AR_REPO }}/${{ vars.SERVICE_NAME }}-web:latest
+        IMAGE: asia-northeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.AR_REPO }}/${{ vars.SERVICE_NAME }}-chat:latest
     steps:
       - uses: actions/checkout@v5
 
@@ -42,5 +42,5 @@ jobs:
 
       - name: Build and Push
         run: |
-          docker build -t "${IMAGE}" -f frontend/Dockerfile frontend
+          docker build -t "${IMAGE}" -f chat-server/Dockerfile chat-server
           docker push "${IMAGE}"
