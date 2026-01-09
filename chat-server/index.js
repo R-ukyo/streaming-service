@@ -6,9 +6,8 @@ const crypto = require("crypto");
 
 const HISTORY_FILE = path.join(__dirname, "chat-history.json");
 
-if (!fs.existsSync(HISTORY_FILE)) {
-    fs.writeFileSync(HISTORY_FILE, JSON.stringify([]));
-}
+// アプリケーション起動時にチャットデータを初期化
+fs.writeFileSync(HISTORY_FILE, JSON.stringify([]));
 
 const server = http.createServer();
 const io = new Server(server, {
