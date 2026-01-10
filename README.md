@@ -1,32 +1,29 @@
 # ストリーミングサービス
 
-GCP Livestream API を使用した HLS ライブストリーミングサービス
+GCP Livestream API を使用した HLS ライブストリーミングサービス（チャット機能付き）
 
 ## アーキテクチャ
 
-このプロジェクトは **GCP Livestream API** を使用してライブストリームを配信します。
+このプロジェクトは **GCP Livestream API** を使用してライブストリームを配信し、リアルタイムチャットを提供します。
 
-- **配信プロトコル**: HLS のみ（MPEG-DASH は使用しません）
-- **エンコーディング**: GCP Livestream API がクラウド上で実行
-- **ストレージ**: Google Cloud Storage (GCS) にセグメントファイルを保存
-- **フロントエンド**: Next.js + hls.js
-- **リバースプロキシ**: Nginx
+- **配信プロトコル**: HLS (High Level Streaming)
+- **エンコーディング**: GCP Livestream API
+- **ストレージ**: Google Cloud Storage (GCS)
+- **フロントエンド**: Next.js (hls.js を使用したプレーヤー)
+- **ライブチャット**: Node.js + Socket.io (永続化機能付き)
+- **リバースプロキシ**: Nginx (Next.js とチャットサーバーへのリクエストを振り分け)
 
 ## 構成
 
 ```
 streaming-service/
-├── frontend/          # Next.js アプリケーション
-│   └── app/
-│       ├── app/
-│       │   ├── page.tsx           # メインページ（HLSプレーヤー）
-│       │   └── hls/[name]/route.ts # GCSからHLSファイルを配信するAPIルート
-│       └── package.json
-├── nginx/             # Nginx設定（リバースプロキシ）
-│   ├── Dockerfile
-│   └── default.conf
-├── gcloud-script/     # GCP Livestream API操作用スクリプト
-└── docker-compose.yml
+├── frontend/          # Next.js プレーヤーアプリ
+│   └── app/           # ソースコード
+├── chat-server/       # Socket.io チャットサーバー
+├── nginx/             # Nginx 設定（リバースプロキシ）
+├── gcloud-script/     # GCP Livestream API 操作用スクリプト
+│   └── livestream/    # ストリーム管理自動化スクリプト
+└── README.md          # このファイル
 ```
 
 ## セットアップ
@@ -38,122 +35,107 @@ streaming-service/
    - Live Stream API
    - Cloud Storage API
 3. サービスアカウントを作成し、以下の権限を付与：
-   - Storage Object Viewer
-   - Live Stream Admin（必要に応じて）
-4. サービスアカウントキー（JSON）をダウンロード
+   - `Storage Object Viewer` (フロントエンドでの再生用)
+   - `Live Stream Admin` (管理スクリプト用)
+4. サービスアカウントキー（JSON）をダウンロードし、以下のパス（例）に配置：
+   - `frontend/app/service-account-key.json`
+   - ※ 環境に合わせて `.env.local` の `GCS_KEY_FILE` を調整してください。
 
 ### 2. 環境変数の設定
 
-`frontend/app/.env.local` ファイルを作成：
+`frontend/app/.env.local` を作成または編集します。
 
 ```env
-HLS_BUCKET=your-livestream-output-bucket
+HLS_BUCKET=your-output-bucket-name
 HLS_PREFIX=mux_video_ts
 ```
 
-- `HLS_BUCKET`: Livestream API の出力先バケット名
-- `HLS_PREFIX`: GCS 内のプレフィックス（Livestream API で設定したパス）
+- `HLS_BUCKET`: Livestream API の出力先 GCS バケット
+- `HLS_PREFIX`: GCS 内のファイル格納パス
 
-### 3. GCP認証情報の配置
-
-ダウンロードしたサービスアカウントキーを以下に配置：
-
-```
-frontend/app/service-account-key.json
-```
-
-> **注意**: このファイルは `.gitignore` に含まれています。本番環境では Workload Identity を使用してください。
-
-### 4. マニフェストファイル名の確認
-
-GCP Livestream API が生成するマニフェストファイル名を確認し、`frontend/app/app/page.tsx` の以下の行を更新：
-
-```typescript
-const src = "/hls/manifest.m3u8";  // または index.m3u8 など
-```
-
-## 起動方法
-
-### 開発環境
+## 起動方法（ローカル開発環境）
 
 ```bash
-# コンテナのビルドと起動
+# 全てのサービス（フロント、チャット、Nginx）を起動
 docker compose up --build
 
-# ブラウザで http://localhost:8080 にアクセス
+# ブラウザでアクセス
+# http://localhost:8080
 ```
 
-### 依存関係の更新
+## 配信の始め方
+
+`gcloud-script/livestream/` にある自動化スクリプトを使用して配信環境を構築します。
+
+### 1. ストリームの作成と開始
 
 ```bash
-docker compose run --rm web pnpm install
+cd gcloud-script/livestream
+bash start-all.sh
 ```
 
-## GCP Livestream API の使用
+このスクリプトは以下の処理を順次実行します：
+1. **インプットエンドポイントの作成**: 配信の入口となるエンドポイントを作成します。
+2. **完了待機**: エンドポイントが利用可能になるまで待機します。
+3. **チャンネルの作成**: エンコーディング設定を含むチャンネルを作成します。
+4. **チャンネルの開始**: 配信可能な状態にします。
 
-`gcloud-script/` ディレクトリ内のスクリプトを使用して、Livestream API のリソースを管理できます。
+完了すると、**RTMP 配信先 URL** がコンソールに表示されます。
 
-詳細は `gcloud-script/` 内のドキュメントを参照してください。
+### 2. OBS の設定
 
-## 削除された機能
+1. OBS の「設定」>「配信」を開きます。
+2. サービスを「カスタム」に設定します。
+3. **サーバー**: `start-all.sh` で出力された URL の `live/` までの部分を入力します。
+4. **ストリームキー**: `live/` 以降の部分（チャンネル名など）を入力します。
 
-- ローカルエンコーダー（`encoder/`）: GCP Livestream API を使用するため不要
-- MPEG-DASH サポート: HLS のみに統一
+設定後、OBS で「配信開始」をクリックします。
+
+### 3. 再生とチャット
+
+1. ブラウザでフロントエンドにアクセスします。
+2. 配信が開始された後、GCS にファイルが書き込まれるまでしばらく（数十秒）待つと、プレーヤーで再生が始まります。
+3. 右側のチャット欄からメッセージを送信できます。
+
+---
+
+## デプロイ (CI/CD)
+
+このプロジェクトには GitHub Actions が設定されており、`main` ブランチへのプッシュ時に以下の処理が自動で行われます：
+
+1. Docker イメージのビルド
+2. Google Cloud Artifact Registry へのプッシュ
+
+**注意**: GitHub Actions では**ビルドとプッシュまでしか行われません**。Cloud Run へのデプロイ（最新イメージの反映）は、以下のコマンド等を使用して**手動で行う必要があります**。
+
+```bash
+# 例: フロントエンドのデプロイ
+gcloud run deploy [SERVICE_NAME] \
+  --image [IMAGE_URL] \
+  --region asia-northeast1
+```
+
+---
+
+## 配信の終わり方
+
+GCP のリソースを放置すると課金が続くため、終了後は必ず以下のスクリプトを実行してリソースを削除してください。
+
+```bash
+cd gcloud-script/livestream
+bash stop-all.sh
+```
+
+このスクリプトにより、チャンネルの停止・削除およびインプットエンドポイントの削除が行われます。
+
+---
 
 ## トラブルシューティング
 
 ### 動画が再生されない
+- `frontend/app/app/page.tsx` で指定しているマニフェストファイル名（`manifest.m3u8` など）が、GCS 上に実際に生成されているものと一致しているか確認してください。
+- GCS バケットの公開設定、またはサービスアカウントの権限を確認してください。
 
-1. GCS バケットと HLS_PREFIX が正しく設定されているか確認
-2. サービスアカウントに適切な権限があるか確認
-3. ブラウザの開発者ツールでネットワークエラーを確認
-4. マニフェストファイル名が正しいか確認
-
-### 認証エラー
-
-- `GOOGLE_APPLICATION_CREDENTIALS` が正しく設定されているか確認
-- サービスアカウントキーのパスが正しいか確認
-
-## GitHub Actions での Workload Identity Federation 設定
-
-GitHub Actions から GCP リソースへ安全にアクセスするために、サービスアカウントキー（JSON）の代わりに Workload Identity Federation (WIF) を使用します。
-
-### 1. Workload Identity プールとプロバイダの作成 (Google Cloud Console)
-
-1. **[IAM と管理] > [Workload Identity 連携]** に移動します。
-2. **[プールを作成]** をクリックします。
-   - **名前**: `github-pool`（任意）を入力して、[次へ] をクリック。
-3. **[プロバイダを追加]** を選択します。
-   - **プロバイダの選択**: `OpenID Connect (OIDC)`
-   - **プロバイダ名**: `github-provider`（任意）
-   - **発行元（URL）**: `https://token.actions.githubusercontent.com`
-   - **オーディエンス**: デフォルト（通常は変更不要）
-4. **[属性のマッピング]** を設定します：
-   - `google.subject` = `assertion.sub`
-   - `attribute.actor` = `assertion.actor`
-   - `attribute.repository` = `assertion.repository`
-5. **[保存]** をクリックします。
-
-### 2. サービスアカウントへのアクセス許可
-
-1. 作成したプールの詳細画面で **[アクセスを許可]** をクリックします。
-2. 使用したい**サービスアカウント**を選択します。
-3. **[プロバイダで構成された属性を選択]** で以下のように制限を加えます（セキュリティのため必須）：
-   - **属性名**: `repository`
-   - **属性値**: `your-username/streaming-service` (GitHub のユーザー名/リポジトリ名)
-4. **[保存]** をクリックします。
-5. 表示されるポータルから **Workload Identity プロバイダの ID** をコピーします。
-   - 形式: `projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github-pool/providers/github-provider`
-
-### 3. GitHub Actions の設定
-
-GitHub リポジトリの **Settings > Secrets and variables > Actions** に以下の **Variables** を登録します。
-
-- `WORKLOAD_IDENTITY_PROVIDER`: 手順 2-5 でコピーした ID
-- `SERVICE_ACCOUNT`: 使用するサービスアカウントのメールアドレス
-
-## 参考リンク
-
-- [GCP Livestream API ドキュメント](https://cloud.google.com/livestream/docs)
-- [hls.js](https://github.com/video-dev/hls.js/)
-- [Next.js](https://nextjs.org/)
+### チャットが接続できない
+- 各サービス（Frontend, Chat Server, Nginx）が正しく起動しているか確認してください。
+- リバースプロキシの設定（`nginx/default.conf`）が正しいポートを指しているか確認してください。
