@@ -1,2 +1,2 @@
 .pnpm-store
-chat-history
+chat-history/*.json
