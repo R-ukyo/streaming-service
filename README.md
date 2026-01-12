@@ -2,6 +2,10 @@
 
 GCP Livestream API を使用した HLS ライブストリーミングサービス（チャット機能付き）
 
+## デモ
+
+https://github.com/user-attachments/assets/c785e5e2-3828-43fc-99a0-c2a3707debac
+
 ## アーキテクチャ
 
 このプロジェクトは **GCP Livestream API** を使用してライブストリームを配信し、リアルタイムチャットを提供します。
