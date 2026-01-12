@@ -18,7 +18,7 @@ export default function Chat() {
 
     useEffect(() => {
         const newSocket = io({
-            path: '/chat-socket/',
+            path: '/chat/',
         });
 
         setSocket(newSocket);

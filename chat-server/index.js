@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-const HISTORY_FILE = path.join(__dirname, "chat-history.json");
+const HISTORY_FILE = path.join(__dirname, "chat-history/", "chat.json");
 
 // アプリケーション起動時にチャットデータを初期化
 fs.writeFileSync(HISTORY_FILE, JSON.stringify([]));
@@ -15,7 +15,7 @@ const io = new Server(server, {
         origin: "*",
         methods: ["GET", "POST"]
     },
-    path: "/chat-socket/"
+    path: "/chat/"
 });
 
 io.on("connection", (socket) => {
